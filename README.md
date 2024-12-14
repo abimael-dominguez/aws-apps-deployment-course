@@ -5,6 +5,7 @@ This guide will help you set up the development environment and configure AWS cr
 ## Prerequisites
 
 - Python 3.8 or higher
+- Docker installed
 - pip (Python package installer)
 - AWS account with access credentials
 
