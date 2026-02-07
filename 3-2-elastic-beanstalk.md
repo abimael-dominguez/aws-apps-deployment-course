@@ -1,0 +1,1 @@
+# Elastic Beanstalk como Capa Gestionada
