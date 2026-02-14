@@ -6,7 +6,7 @@
 3. **Delete Stack**: Stack Actions → Delete → Verify resources removed
 
 -----
-## Exercise 1 - Creating and Updating Stacks (Using the Console)
+## Exercise 1 - Creating and Updating Stacks (using the Console)
 
 1. Create a Stack (1-ec2-template.md)
     - Use Template -> Upload File -> Name Stack -> Submit
@@ -25,7 +25,7 @@
 
 ---
 
-## Exercise 1 - Creating and Updating Stacks (Using the AWS CLI)
+## Exercise 1 - Creating and Updating Stacks (using the AWS CLI)
 
 ## CLI Workflow
 
@@ -38,12 +38,29 @@ aws configure list-profiles  # List available profiles
 
 ### Setup Profile & Credentials
 
-If you need to create/update a profile with access keys:
-1. Get access keys from IAM Console: **User → Security credentials → Access keys → Create/Download (the .csv)**
-2. Configure profile:
+**Option 1: Using `aws configure` (recommended)**
+
+Get access keys from IAM Console: **User → Security credentials → Access keys → Create/Download CSV**
+
 ```bash
 aws configure --profile <PROFILE_NAME>
-# Prompts for: Access Key ID, Secret Access Key, Region (us-east-1), Output (json)
+# Prompts: Access Key ID, Secret Access Key, Region (us-east-1), Output (json)
+```
+
+**Option 2: Manual setup (edit files directly)**
+
+Create/edit `~/.aws/config`:
+```ini
+[profile data-engineer]
+region = us-east-1
+output = json
+```
+
+Create/edit `~/.aws/credentials`:
+```ini
+[data-engineer]
+aws_access_key_id = 
+aws_secret_access_key = 
 ```
 
 **Verify credentials work:**
@@ -54,7 +71,8 @@ aws sts get-caller-identity --profile "$AWS_PROFILE"
 ```
 
 > **Troubleshooting `InvalidClientTokenId`:**  
-> - Access keys: Invalid/expired/deleted → Rotate keys in IAM Console
+> - Access keys: Invalid/expired/deleted → Rotate keys in IAM Console  
+> - Never share `~/.aws/credentials` – contains sensitive keys
 ---
 
 ### Environment Setup
@@ -72,6 +90,11 @@ echo "Profile: $AWS_PROFILE | Region: $AWS_REGION | Stack: $STACK_NAME"
 ---
 
 ### Step 1: Create Stack
+
+Navigate to the templates directory:
+```bash
+cd ejercicios-2/2-2/1-crear-actualizar-stacks/
+```
 
 Validate and deploy the first template:
 ```bash
@@ -191,5 +214,3 @@ aws cloudformation describe-stack-events \
   --stack-name "$STACK_NAME" \
   --region "$AWS_REGION" --profile "$AWS_PROFILE" --max-items 10
 ```
-
-**Security note:** Never share `~/.aws/credentials` – it contains sensitive keys.
