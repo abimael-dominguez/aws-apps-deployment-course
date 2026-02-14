@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2026-02-14'
+AWSTemplateFormatVersion: '2010-09-09'
 Description: Add an Amazon S3 bucket to the setup, retaining all previous resources
 
 Resources:

@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2026-02-14'
+AWSTemplateFormatVersion: '2010-09-09'
 Description: Attach an EBS volume to the EC2 instance, retaining original resources
 Resources:
   InstanceSecurityGroup:

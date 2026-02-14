@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2026-02-14
+AWSTemplateFormatVersion: '2010-09-09'
 Description: Create an EC2 instance with a security group for SSH access
 Resources:
   InstanceSecurityGroup:
