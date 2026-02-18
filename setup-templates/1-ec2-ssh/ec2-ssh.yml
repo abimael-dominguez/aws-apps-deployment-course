@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Single EC2 instance (Free Tier friendly) in a public subnet with SSH access.
+  Creates its own VPC + Internet Gateway + route to the Internet.
+
+Parameters:
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    # Default: Amazon Linux 2023 (kernel 6.1) in us-east-1
+    # Alternative example: Ubuntu 24.04 (us-east-1) ami-0b6c6ebed2801a5cb (SSH user: ubuntu)
+    Default: ami-0c1fe732b5494dc14
+    Description: AMI ID to use for the instance.
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+    Description: "Instance type (minimum/free-tier-friendly: t3.micro; availability may vary by region)."
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Existing EC2 KeyPair name to enable SSH.
+
+  AllowedCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR allowed to SSH to the instance (recommend your public IP /32).
+
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-1a
+    Description: "Availability Zone for the subnet/instance (choose one that supports the instance type)."
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnetCidr:
+    Type: String
+    Default: 10.0.1.0/24
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: ec2-ssh-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: ec2-ssh-igw
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: !Ref PublicSubnetCidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: ec2-ssh-public-subnet
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: ec2-ssh-public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  SshSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH from AllowedCidr
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ec2-ssh-sg
+
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref SshSecurityGroup
+      Tags:
+        - Key: Name
+          Value: ec2-ssh-instance
+
+Outputs:
+  InstanceId:
+    Description: EC2 instance id
+    Value: !Ref Ec2Instance
+
+  PublicIp:
+    Description: Public IPv4 address
+    Value: !GetAtt Ec2Instance.PublicIp
+
+  PublicDnsName:
+    Description: Public DNS name
+    Value: !GetAtt Ec2Instance.PublicDnsName
+
+  SecurityGroupId:
+    Description: Security group id
+    Value: !Ref SshSecurityGroup
+
+  SshCommand:
+    Description: SSH command template (replace the key path)
+    Value: !Sub 'ssh -i <path-to-private-key.pem> <ssh-user>@${Ec2Instance.PublicDnsName}'
