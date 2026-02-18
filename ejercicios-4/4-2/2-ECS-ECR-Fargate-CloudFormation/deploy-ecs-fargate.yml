@@ -1,0 +1,279 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  FastAPI en ECS Fargate - Despliegue completo con VPC, ECR, IAM y ECS.
+  Incluye: VPC con subnet pública, Security Group, ECR Repository, 
+  Cluster ECS, Task Definition y Service Fargate.
+
+# =============================================================================
+# PARÁMETROS
+# =============================================================================
+Parameters:
+  ImageURI:
+    Type: String
+    Description: >-
+      URI completa de la imagen ECR 
+      (ej: 111122223333.dkr.ecr.us-east-1.amazonaws.com/fastapi-repo:latest)
+
+  ContainerPort:
+    Type: Number
+    Default: 8000
+    Description: Puerto que expone el contenedor FastAPI
+
+  AllowedCidr:
+    Type: String
+    Default: "0.0.0.0/0"
+    Description: CIDR permitido para acceder al puerto del contenedor
+
+  TaskCpu:
+    Type: String
+    Default: "256"
+    AllowedValues: ["256", "512", "1024", "2048", "4096"]
+    Description: CPU para la tarea (256 = 0.25 vCPU)
+
+  TaskMemory:
+    Type: String
+    Default: "512"
+    AllowedValues: ["512", "1024", "2048", "4096", "8192"]
+    Description: Memoria en MB para la tarea
+
+  DesiredCount:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 10
+    Description: Número de tareas/réplicas a ejecutar en el Service
+
+# =============================================================================
+# RECURSOS
+# =============================================================================
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # NETWORKING - VPC, Subnet, Internet Gateway, Route Table
+  # ---------------------------------------------------------------------------
+  
+  FastApiVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "10.0.0.0/24"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: fastapi-ecs-vpc
+        - Key: Project
+          Value: ECS-FastAPI-Practice
+
+  FastApiSubnetPublic:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FastApiVPC
+      CidrBlock: "10.0.0.0/26"
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: fastapi-ecs-public-subnet
+
+  FastApiInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: fastapi-ecs-igw
+
+  AttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref FastApiVPC
+      InternetGatewayId: !Ref FastApiInternetGateway
+
+  FastApiRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref FastApiVPC
+      Tags:
+        - Key: Name
+          Value: fastapi-ecs-rt
+
+  FastApiRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachIGW
+    Properties:
+      RouteTableId: !Ref FastApiRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref FastApiInternetGateway
+
+  FastApiSubnetRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FastApiSubnetPublic
+      RouteTableId: !Ref FastApiRouteTable
+
+  # ---------------------------------------------------------------------------
+  # SECURITY - Security Group
+  # ---------------------------------------------------------------------------
+
+  FastApiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow inbound traffic to FastAPI container port
+      GroupName: fastapi-ecs-sg
+      VpcId: !Ref FastApiVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          CidrIp: !Ref AllowedCidr
+          Description: Allow HTTP access to container
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: "0.0.0.0/0"
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: fastapi-ecs-sg
+
+  # ---------------------------------------------------------------------------
+  # LOGGING - CloudWatch Log Group
+  # ---------------------------------------------------------------------------
+
+  FastApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
+  # ---------------------------------------------------------------------------
+  # IAM - Roles para ECS Tasks
+  # ---------------------------------------------------------------------------
+
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Rol de ejecucion para tareas ECS (pull images, logs)
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Rol para la aplicacion dentro del contenedor
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      # Agregar políticas adicionales aquí si la app necesita acceder a otros servicios AWS
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
+  # ---------------------------------------------------------------------------
+  # ECS - Cluster, Task Definition, Service
+  # ---------------------------------------------------------------------------
+
+  FastApiCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: fastapi-ecs-cluster
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Project
+          Value: ECS-FastAPI-Practice
+
+  FastApiTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: fastapi-store-task
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn
+      ContainerDefinitions:
+        - Name: fastapi-container
+          Image: !Ref ImageURI
+          Essential: true
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref FastApiLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: fastapi
+      Tags:
+        - Key: Project
+          Value: ECS-FastAPI-Practice
+
+  FastApiService:
+    Type: AWS::ECS::Service
+    DependsOn: FastApiRoute
+    Properties:
+      ServiceName: fastapi-service
+      Cluster: !Ref FastApiCluster
+      DesiredCount: !Ref DesiredCount
+      LaunchType: FARGATE
+      TaskDefinition: !Ref FastApiTaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref FastApiSecurityGroup
+          Subnets:
+            - !Ref FastApiSubnetPublic
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 50
+      Tags:
+        - Key: Project
+          Value: ECS-FastAPI-Practice
+
+# =============================================================================
+# OUTPUTS
+# =============================================================================
+Outputs:
+  ClusterName:
+    Description: Nombre del Cluster ECS
+    Value: !Ref FastApiCluster
+    Export:
+      Name: !Sub "${AWS::StackName}-ClusterName"
+
+  ServiceName:
+    Description: Nombre del Service ECS
+    Value: !Ref FastApiService
+    Export:
+      Name: !Sub "${AWS::StackName}-ServiceName"
+
+  PublicSubnetId:
+    Description: ID de la Subnet pública donde corren las tareas
+    Value: !Ref FastApiSubnetPublic
+
+  SecurityGroupId:
+    Description: ID del Security Group
+    Value: !Ref FastApiSecurityGroup
+
+  VPCId:
+    Description: ID de la VPC creada
+    Value: !Ref FastApiVPC
+
+  LogGroupName:
+    Description: Nombre del Log Group de CloudWatch
+    Value: !Ref FastApiLogGroup
