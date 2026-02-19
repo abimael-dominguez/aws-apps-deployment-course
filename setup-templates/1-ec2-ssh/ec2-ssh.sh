@@ -9,16 +9,15 @@ TEMPLATE_FILE="${TEMPLATE_FILE:-ec2-ssh.yml}"
 STACK_NAME="${STACK_NAME:-ec2-ssh-stack}"
 
 # AMI ID (parameter in ec2-ssh.yml)
-AMI_ID="${AMI_ID:-ami-0c1fe732b5494dc14}"  # Amazon Linux 2023 (kernel 6.1) (us-east-1)
-# Alternative example: Ubuntu 24.04 (us-east-1) ami-0b6c6ebed2801a5cb (SSH user: ubuntu)
+AMI_ID="${AMI_ID:-ami-0f3caa1cf4417e51b}" 
 
 # REQUIRED: existing EC2 KeyPair name in the chosen region
-KEY_NAME="${KEY_NAME:-key-pair-ubuntu-server-tecgurus-001}"
+KEY_NAME="${KEY_NAME:-ex4-aws-ami-ec2-key-pair}"
 
 # Security: prefer your public IP /32 instead of 0.0.0.0/0
 ALLOWED_CIDR="${ALLOWED_CIDR:-0.0.0.0/0}"
 
-INSTANCE_TYPE="${INSTANCE_TYPE:-t3.micro}"
+INSTANCE_TYPE="${INSTANCE_TYPE:-t3.small}"
 AVAILABILITY_ZONE="${AVAILABILITY_ZONE:-${AWS_REGION}a}"
 VPC_CIDR="${VPC_CIDR:-10.0.0.0/16}"
 PUBLIC_SUBNET_CIDR="${PUBLIC_SUBNET_CIDR:-10.0.1.0/24}"

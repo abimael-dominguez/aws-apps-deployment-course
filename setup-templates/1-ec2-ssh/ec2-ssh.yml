@@ -6,17 +6,13 @@ Description: >
 Parameters:
   AmiId:
     Type: AWS::EC2::Image::Id
-    # Default: Amazon Linux 2023 (kernel 6.1) in us-east-1
-    # Alternative example: Ubuntu 24.04 (us-east-1) ami-0b6c6ebed2801a5cb (SSH user: ubuntu)
     Default: ami-0c1fe732b5494dc14
     Description: AMI ID to use for the instance.
 
   InstanceType:
     Type: String
-    Default: t3.micro
-    AllowedValues:
-      - t3.micro
-    Description: "Instance type (minimum/free-tier-friendly: t3.micro; availability may vary by region)."
+    Default: t3.small
+    Description: "Instance type, free-tier-friendly; availability may vary by region)."
 
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
