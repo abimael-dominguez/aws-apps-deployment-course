@@ -26,13 +26,13 @@ Parameters:
 
   TaskCpu:
     Type: String
-    Default: "256"
+    Default: "512"
     AllowedValues: ["256", "512", "1024", "2048", "4096"]
     Description: CPU para la tarea (256 = 0.25 vCPU)
 
   TaskMemory:
     Type: String
-    Default: "512"
+    Default: "1024"
     AllowedValues: ["512", "1024", "2048", "4096", "8192"]
     Description: Memoria en MB para la tarea
 
