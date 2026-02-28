@@ -29,12 +29,14 @@ Prototipo didactico de Canary en ECS Fargate + ALB usando reparto de trafico por
    ```
 4. Cambiar porcentaje gradualmente:
    ```bash
+   # ./deploy.sh set-weights <stable-weight> <canary-weight>
    ./deploy.sh set-weights 75 25
    ./deploy.sh set-weights 50 50
    ./deploy.sh set-weights 0 100
    ```
 5. Rollback inmediato:
    ```bash
+   # Implies stable-weight=100 canary-weight=0
    ./deploy.sh rollback
    ```
 
@@ -52,9 +54,30 @@ Prototipo didactico de Canary en ECS Fargate + ALB usando reparto de trafico por
 Nota didactica:
 - Si `IMAGE_URI_STABLE` y `IMAGE_URI_CANARY` apuntan a la misma imagen, sirve para practicar el flujo de canary, pero no para validar diferencias funcionales entre versiones.
 
-## Target Group vs. Servicio vs. Task
+## Mapa de conceptos clave (para ML engineers)
 
-Target Group: es una colección lógica de endpoints (normalmente instancias EC2, IPs o tareas ECS registradas) a la que envía tráfico un balanceador de carga (ALB/NLB). Piensa en él como el “destino” al que el balanceador manda solicitudes; puede tener reglas de salud (health checks) y solo recibe tráfico si sus endpoints están saludables.
-Servicio (ECS Service): en ECS representa una definición de cómo correr y mantener en ejecución una o más tareas basadas en una task definition. Controla cuántas tareas deben estar activas, las registra en un target group si lo necesitas, y puede hacer despliegues (rolling updates, blue/green, etc.). Es la entidad con la que se asegura que siempre haya la capacidad deseada.
-Task (ECS Task): es la instancia real de ejecución. Parte de una task definition (que describe contenedores, recursos y permisos) y contiene los contenedores corriendo. Una tarea puede ser efímera (ada-hoc) o permanente cuando la gestiona un servicio.
-En resumen: el servicio administra y mantiene tasks en ejecución; cada task ejecuta tus contenedores. El target group es el destino al que el balanceador dirige el tráfico para llegar a tus tasks (o instancias) saludables.
+- **Task Definition**
+  Plantilla de ejecucion del contenedor: imagen (modelo/API), CPU/memoria, puertos, variables, logs y roles IAM.
+
+- **Task (ECS Task)**
+  Instancia real corriendo desde una task definition. Aqui vive tu endpoint de inferencia en ejecucion.
+
+- **Servicio (ECS Service)**
+  Controla cuantas tasks deben estar activas (`desired count`), las reemplaza si fallan y las registra en target groups.
+
+- **Target Group**
+  Conjunto de endpoints (IP/tasks) a los que ALB envia trafico. Solo enruta a los que pasan health checks.
+
+- **Listener / reglas del ALB**
+  Punto de entrada HTTP/HTTPS. Decide a que target group enviar trafico (100/0 en blue-green, 95/5 o similar en canary).
+
+- **Health Checks**
+  Sonda de salud del ALB (ej: `/`). Si falla, esa task deja de recibir requests. Es clave para evitar serving degradado.
+
+- **Estrategia de despliegue**
+  `Canary`: subes porcentaje gradualmente y validas metricas.  
+  `Blue/Green`: cambias 100% de trafico entre dos entornos y haces rollback rapido.
+
+**Resumen operativo:**  
+`Task Definition -> Tasks -> ECS Service -> Target Group -> ALB Listener -> Usuario`  
+Para ML, piensa en esto como un pipeline de serving versionado: despliegas una nueva version de modelo/API, observas `error rate`, `latencia p95/p99` y consumo, y solo entonces aumentas trafico.
