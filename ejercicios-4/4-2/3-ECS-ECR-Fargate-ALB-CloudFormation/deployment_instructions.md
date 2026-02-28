@@ -30,3 +30,10 @@ Esta entrega incluye:
 ## Notas
 - El script usa `aws cloudformation deploy` para crear/actualizar la pila y `aws cloudformation wait` para esperar a que termine.
 - Si usas la ECR que crea la pila, sube la imagen **después** de crear la pila o define IMAGE_URI apuntando a tu repo externo.
+
+## Cómo probar el ALB (Application Load Balancer)
+- Para tu stack, prueba el DNS del ALB (output `ALBPublicDNS`) y usa HTTP en puerto 80.
+- URL base: `http://<ALBPublicDNS>/`
+- Endpoint whoami: `http://<ALBPublicDNS>/whoami`
+- No necesitas agregar `:80` porque es el puerto por defecto de HTTP.
+- En tu plantilla el Listener del ALB está en 80 y reenvía al contenedor en 8000 internamente.
