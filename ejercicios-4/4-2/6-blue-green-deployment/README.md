@@ -50,3 +50,32 @@ Prototipo didactico de Blue/Green en ECS Fargate + ALB con cambio total de trafi
 
 Nota didactica:
 - Blue/Green requiere tener ambos entornos activos al mismo tiempo para poder conmutar y volver atras rapido.
+
+
+## Conceptos clave
+
+- **Task Definition**
+  Plantilla de ejecucion del contenedor: imagen (modelo/API), CPU/memoria, puertos, variables, logs y roles IAM.
+
+- **Task (ECS Task)**
+  Instancia real corriendo desde una task definition. Aqui vive tu endpoint de inferencia en ejecucion.
+
+- **Servicio (ECS Service)**
+  Controla cuantas tasks deben estar activas (`desired count`), las reemplaza si fallan y las registra en target groups.
+
+- **Target Group**
+  Conjunto de endpoints (IP/tasks) a los que ALB envia trafico. Solo enruta a los que pasan health checks.
+
+- **Listener / reglas del ALB**
+  Punto de entrada HTTP/HTTPS. Decide a que target group enviar trafico (100/0 en blue-green, 95/5 o similar en canary).
+
+- **Health Checks**
+  Sonda de salud del ALB (ej: `/`). Si falla, esa task deja de recibir requests. Es clave para evitar serving degradado.
+
+- **Estrategia de despliegue**
+  `Canary`: subes porcentaje gradualmente y validas metricas.  
+  `Blue/Green`: cambias 100% de trafico entre dos entornos y haces rollback rapido.
+
+**Resumen operativo:**  
+`Task Definition -> Tasks -> ECS Service -> Target Group -> ALB Listener -> Usuario`  
+Para ML, piensa en esto como un pipeline de serving versionado: despliegas una nueva version de modelo/API, observas `error rate`, `latencia p95/p99` y consumo, y solo entonces aumentas trafico.

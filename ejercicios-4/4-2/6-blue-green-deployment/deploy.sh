@@ -6,8 +6,8 @@ AWS_REGION="${AWS_REGION:-us-east-1}"
 STACK_NAME="${STACK_NAME:-ecs-blue-green-demo-stack}"
 TEMPLATE_FILE="${TEMPLATE_FILE:-deploy-blue-green.yml}"
 
-IMAGE_URI_BLUE="${IMAGE_URI_BLUE:-}"
-IMAGE_URI_GREEN="${IMAGE_URI_GREEN:-}"
+IMAGE_URI_BLUE="${IMAGE_URI_BLUE:-894064921954.dkr.ecr.us-east-1.amazonaws.com/dev/fastapi-repo:latest}"
+IMAGE_URI_GREEN="${IMAGE_URI_GREEN:-894064921954.dkr.ecr.us-east-1.amazonaws.com/dev/fastapi-repo:latest}"
 ACTIVE_COLOR="${ACTIVE_COLOR:-blue}"
 
 CONTAINER_PORT="${CONTAINER_PORT:-8000}"

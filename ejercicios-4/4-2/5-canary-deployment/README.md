@@ -54,7 +54,7 @@ Prototipo didactico de Canary en ECS Fargate + ALB usando reparto de trafico por
 Nota didactica:
 - Si `IMAGE_URI_STABLE` y `IMAGE_URI_CANARY` apuntan a la misma imagen, sirve para practicar el flujo de canary, pero no para validar diferencias funcionales entre versiones.
 
-## Mapa de conceptos clave (para ML engineers)
+## Conceptos clave
 
 - **Task Definition**
   Plantilla de ejecucion del contenedor: imagen (modelo/API), CPU/memoria, puertos, variables, logs y roles IAM.
