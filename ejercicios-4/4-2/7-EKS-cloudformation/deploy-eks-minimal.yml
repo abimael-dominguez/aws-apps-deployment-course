@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  EKS minimo para practica de despliegue de API en Kubernetes.
+  Incluye: VPC publica simple, roles IAM, cluster EKS y node group.
+  Sin ALB; el acceso a la app se realiza con Service tipo NodePort.
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: retail-eks-cluster
+    Description: Nombre del cluster EKS
+
+  NodeGroupName:
+    Type: String
+    Default: retail-eks-ng
+    Description: Nombre del managed node group
+
+  KubernetesVersion:
+    Type: String
+    Default: "1.30"
+    AllowedValues: ["1.29", "1.30", "1.31"]
+    Description: Version de Kubernetes para EKS
+
+  NodeInstanceType:
+    Type: String
+    Default: t3.micro
+    Description: Tipo de instancia EC2 para nodos
+
+  DesiredSize:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 4
+    Description: Numero de nodos deseados
+
+  MinSize:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 4
+    Description: Minimo de nodos
+
+  MaxSize:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 6
+    Description: Maximo de nodos
+
+  AllowedCidr:
+    Type: String
+    Default: "0.0.0.0/0"
+    Description: CIDR permitido para NodePort de la app
+
+  NodePort:
+    Type: Number
+    Default: 30080
+    MinValue: 30000
+    MaxValue: 32767
+    Description: Puerto NodePort para exponer la API
+
+Resources:
+  EKSVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.20.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: retail-eks-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: retail-eks-igw
+
+  AttachIgw:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref EKSVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref EKSVPC
+      CidrBlock: 10.20.0.0/20
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: retail-eks-public-a
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref EKSVPC
+      CidrBlock: 10.20.16.0/20
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: retail-eks-public-b
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref EKSVPC
+      Tags:
+        - Key: Name
+          Value: retail-eks-public-rt
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachIgw
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteAssocA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  SubnetRouteAssocB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  EKSSharedSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group compartido para cluster y nodos EKS
+      VpcId: !Ref EKSVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref NodePort
+          ToPort: !Ref NodePort
+          CidrIp: !Ref AllowedCidr
+          Description: Acceso externo al NodePort de la app
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: retail-eks-shared-sg
+
+  EKSClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+  EKSNodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref ClusterName
+      Version: !Ref KubernetesVersion
+      RoleArn: !GetAtt EKSClusterRole.Arn
+      ResourcesVpcConfig:
+        SubnetIds:
+          - !Ref PublicSubnetA
+          - !Ref PublicSubnetB
+        SecurityGroupIds:
+          - !Ref EKSSharedSecurityGroup
+        EndpointPublicAccess: true
+        EndpointPrivateAccess: false
+
+  EKSNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    DependsOn: EKSCluster
+    Properties:
+      ClusterName: !Ref EKSCluster
+      NodegroupName: !Ref NodeGroupName
+      NodeRole: !GetAtt EKSNodeRole.Arn
+      Subnets:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+      InstanceTypes:
+        - !Ref NodeInstanceType
+      ScalingConfig:
+        DesiredSize: !Ref DesiredSize
+        MinSize: !Ref MinSize
+        MaxSize: !Ref MaxSize
+      AmiType: AL2_x86_64
+      DiskSize: 20
+
+Outputs:
+  ClusterName:
+    Description: Nombre del cluster EKS
+    Value: !Ref EKSCluster
+
+  NodeGroupName:
+    Description: Nombre del managed node group
+    Value: !Ref EKSNodeGroup
+
+  VpcId:
+    Description: VPC creada para EKS
+    Value: !Ref EKSVPC
+
+  SharedSecurityGroupId:
+    Description: Security Group compartido para cluster y nodos (expone NodePort)
+    Value: !Ref EKSSharedSecurityGroup
+
+  NodePortValue:
+    Description: NodePort sugerido para el Service Kubernetes
+    Value: !Ref NodePort
