@@ -156,10 +156,15 @@ Resources:
   FastApiSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow inbound traffic to FastAPI container port
+      GroupDescription: Allow inbound HTTP for ALB and app traffic to container port
       GroupName: fastapi-ecs-sg
       VpcId: !Ref FastApiVPC
       SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AllowedCidr
+          Description: Allow HTTP access to ALB listener
         - IpProtocol: tcp
           FromPort: !Ref ContainerPort
           ToPort: !Ref ContainerPort
@@ -284,11 +289,11 @@ Resources:
   # ---------------------------------------------------------------------------
   FastApiScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: FastApiService
     Properties:
       MaxCapacity: !Ref MaxCapacity
       MinCapacity: !Ref MinCapacity
-      ResourceId: !Sub "service/${FastApiCluster}/${FastApiService}"
-      RoleARN: !GetAtt EcsTaskExecutionRole.Arn
+      ResourceId: !Sub "service/${FastApiCluster}/fastapi-service"
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
 
