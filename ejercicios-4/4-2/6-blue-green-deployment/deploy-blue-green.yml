@@ -44,6 +44,7 @@ Parameters:
 
 Conditions:
   IsBlue: !Equals [!Ref ActiveColor, blue]
+  IsGreen: !Equals [!Ref ActiveColor, green]
 
 Resources:
   VPC:
@@ -162,7 +163,12 @@ Resources:
       Protocol: HTTP
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !If [IsBlue, !Ref BlueTargetGroup, !Ref GreenTargetGroup]
+          ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref BlueTargetGroup
+                Weight: !If [IsBlue, 100, 0]
+              - TargetGroupArn: !Ref GreenTargetGroup
+                Weight: !If [IsGreen, 100, 0]
 
   LogGroup:
     Type: AWS::Logs::LogGroup

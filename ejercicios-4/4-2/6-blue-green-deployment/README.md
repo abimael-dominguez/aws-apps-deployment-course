@@ -46,6 +46,12 @@ Prototipo didactico de Blue/Green en ECS Fargate + ALB con cambio total de trafi
    curl -s "http://<ALB_DNS>/"
    curl -s "http://<ALB_DNS>/whoami"
    ```
+
+4. O lanzar varias peticiones:
+   ```bash
+   for i in {1..20}; do curl -s "http://<ALB_DNS>/whoami"; echo; done
+   ```
+  
 3. Si usas imagenes distintas (v1/v2), valida que el comportamiento cambie tras `switch green` y regrese tras `switch blue`.
 
 Nota didactica:
