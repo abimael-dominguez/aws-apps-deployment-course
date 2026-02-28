@@ -1,0 +1,5 @@
+[
+  {"id": 1, "name": "Ana", "country": "PE", "active": true},
+  {"id": 2, "name": "Luis", "country": "MX", "active": true},
+  {"id": 3, "name": "Marta", "country": "CO", "active": false}
+]
