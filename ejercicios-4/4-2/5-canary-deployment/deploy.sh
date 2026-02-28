@@ -16,6 +16,7 @@ DESIRED_COUNT_CANARY="${DESIRED_COUNT_CANARY:-1}"
 TASK_CPU="${TASK_CPU:-256}"
 TASK_MEMORY="${TASK_MEMORY:-512}"
 
+# Estos pesos se pueden comprobar en el listener del ALB. El peso canary se puede ajustar con set-weights o rollback
 STABLE_WEIGHT="${STABLE_WEIGHT:-95}"
 CANARY_WEIGHT="${CANARY_WEIGHT:-5}"
 
